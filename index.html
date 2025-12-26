@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Loto Play</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at 20% 20%, #1f2937, #0b1220 60%);
+      font-family: "Segoe UI", Arial, sans-serif;
+      color: #e5e7eb;
+      padding: 24px;
+    }
+    .panel {
+      width: 100%;
+      max-width: 520px;
+      background: rgba(17, 24, 39, 0.9);
+      border: 1px solid #1f2937;
+      border-radius: 18px;
+      padding: 22px 20px;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+      backdrop-filter: blur(4px);
+    }
+    h1 { margin: 0 0 8px; font-size: 24px; letter-spacing: 0.3px; }
+    p { margin: 0 0 18px; color: #9ca3af; }
+    .row {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+    label { font-size: 14px; color: #cbd5e1; }
+    input {
+      flex: 1;
+      padding: 12px;
+      font-size: 16px;
+      border-radius: 12px;
+      border: 1px solid #334155;
+      background: #0f172a;
+      color: #e5e7eb;
+    }
+    input:focus { outline: 2px solid #2563eb; border-color: #2563eb; }
+    button {
+      padding: 12px 16px;
+      font-size: 16px;
+      border: none;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+      color: #fff;
+      cursor: pointer;
+      transition: transform 120ms ease, box-shadow 120ms ease;
+      white-space: nowrap;
+    }
+    button:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 12px 24px rgba(37, 99, 235, 0.35); }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    pre {
+      background: #0a0f1a;
+      border: 1px solid #111827;
+      color: #cbd5e1;
+      padding: 14px;
+      border-radius: 12px;
+      min-height: 140px;
+      white-space: pre-wrap;
+      margin: 0;
+      font-size: 14px;
+    }
+    .history {
+      margin-top: 14px;
+      background: #0a0f1a;
+      border: 1px solid #111827;
+      border-radius: 12px;
+      padding: 12px;
+      max-height: 260px;
+      overflow: auto;
+    }
+    .history h3 { margin: 0 0 8px; font-size: 16px; color: #cbd5e1; }
+    .history-item {
+      display: grid;
+      grid-template-columns: 1.5fr 1fr 1fr 1.5fr;
+      gap: 8px;
+      padding: 8px 0;
+      border-bottom: 1px solid #111827;
+      font-size: 13px;
+    }
+    .history-item:last-child { border-bottom: none; }
+    .history-item .win { color: #34d399; }
+    .history-item .lose { color: #f87171; }
+  </style>
+</head>
+<body>
+  <main class="panel">
+    <h1>Loto Play</h1>
+    <p>FastAPI endpoints: <code>GET /balance</code> | <code>POST /play</code></p>
+
+    <div class="row">
+      <label for="userId">User</label>
+      <input id="userId" type="text" value="demo" />
+      <div style="font-weight: 600;">Current: <span id="currentUser">demo</span></div>
+    </div>
+
+    <div class="row">
+      <label for="bet">Bet</label>
+      <input id="bet" type="number" min="1" value="10" />
+      <button id="playBtn">Play</button>
+    </div>
+
+    <div class="row" style="justify-content: space-between; margin-bottom: 18px;">
+      <div style="font-weight: 600;">Balance: <span id="balanceValue">--</span></div>
+      <div style="display:flex; gap:8px;">
+        <button id="balanceBtn">Refresh</button>
+        <button id="resetBtn">Reset</button>
+        <button id="historyBtn">History</button>
+        <button id="pingBtn">Ping</button>
+      </div>
+    </div>
+
+    <pre id="output">Ready</pre>
+    <div class="history" id="history">
+      <h3>History</h3>
+      <div id="historyList"></div>
+    </div>
+
+    <!-- Admin endpoints require header X-Admin-Token: 12345 -->
+    <div class="history" style="margin-top:12px;">
+      <h3>Admin (optional)</h3>
+      <div class="row" style="margin-bottom: 8px; gap:8px; align-items:flex-end;">
+        <div style="flex:1;">
+          <label for="adminToken">Admin Token</label>
+          <input id="adminToken" type="text" placeholder="admin token" />
+        </div>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <button id="adminListBtn">List users</button>
+          <div style="color:#9ca3af; font-size: 12px;">X-Admin-Token: <span id="adminTokenText">not set</span></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    // Admin endpoints require header X-Admin-Token: 12345
+    const API = window.location.origin;
+    const userIdInput = document.getElementById("userId");
+    const currentUser = document.getElementById("currentUser");
+    const betInput = document.getElementById("bet");
+    const playBtn = document.getElementById("playBtn");
+    const balanceBtn = document.getElementById("balanceBtn");
+    const resetBtn = document.getElementById("resetBtn");
+    const historyBtn = document.getElementById("historyBtn");
+    const pingBtn = document.getElementById("pingBtn");
+    const adminTokenInput = document.getElementById("adminToken");
+    const adminListBtn = document.getElementById("adminListBtn");
+    const adminTokenText = document.getElementById("adminTokenText");
+    const balanceValue = document.getElementById("balanceValue");
+    const output = document.getElementById("output");
+    const historyList = document.getElementById("historyList");
+    let adminToken = "";
+
+    function getUserId() {
+      const value = (userIdInput.value || "").trim();
+      return value || "demo";
+    }
+
+    function syncUserLabel() {
+      currentUser.textContent = getUserId();
+    }
+
+    function show(text, data) {
+      if (data !== undefined) {
+        output.textContent = `${text}\n${JSON.stringify(data, null, 2)}`;
+      } else {
+        output.textContent = text;
+      }
+    }
+
+    function showFetchError(url, err) {
+      if (err && err.status) {
+        const status = `${err.status} ${err.statusText || ""}`.trim();
+        show(`Request failed (${status}): ${url}`);
+        return;
+      }
+      const message = err && err.message ? err.message : String(err);
+      show(`Request failed: ${message}\nURL: ${url}`);
+    }
+
+    function renderHistory(items) {
+      if (!items || items.length === 0) {
+        historyList.innerHTML = '<div style="color:#9ca3af;">No history</div>';
+        return;
+      }
+      historyList.innerHTML = items
+        .map((item) => {
+          const winText = item.win ? '<span class="win">WIN</span>' : '<span class="lose">LOSE</span>';
+          const rangeText = `${item.coin_before} -> ${item.coin_after}`;
+          const ts = item.ts || "";
+          return `<div class="history-item"><div>${ts}</div><div>Bet: ${item.bet}</div><div>${winText}</div><div>${rangeText}</div></div>`;
+        })
+        .join("");
+    }
+
+    async function play() {
+      const userId = getUserId();
+      const bet = Number(betInput.value || 0);
+      if (!bet || bet <= 0) {
+        show("Bet must be greater than 0");
+        return;
+      }
+      playBtn.disabled = true;
+      show("Sending...");
+      try {
+        const url = `${API}/play`;
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user_id: userId, bet })
+        });
+        const data = await res.json();
+        if (res.status === 401) {
+          show("Unauthorized (401).", data);
+        } else if (!res.ok) {
+          showFetchError(url, res);
+        } else if (data.error) {
+          show("Error: " + data.error, data);
+        } else {
+          show("Response received", data);
+        }
+        if (data.coin !== undefined) {
+          balanceValue.textContent = data.coin;
+        } else if (data.balance !== undefined) {
+          balanceValue.textContent = data.balance;
+        }
+      } catch (err) {
+        showFetchError(`${API}/play`, err);
+      } finally {
+        playBtn.disabled = false;
+      }
+    }
+
+    async function fetchBalance(options = {}) {
+      const userId = getUserId();
+      const silent = options.silent === true;
+      if (!silent) show("Checking balance...");
+      balanceBtn.disabled = true;
+      try {
+        const url = `${API}/balance?user_id=${encodeURIComponent(userId)}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        balanceValue.textContent = data.coin ?? data.balance ?? "--";
+        if (!silent) {
+          if (res.status === 401) {
+            show("Unauthorized (401).", data);
+          } else if (!res.ok) {
+            showFetchError(url, res);
+          } else if (data.error) {
+            show("Error: " + data.error, data);
+          } else {
+            show("Balance updated", data);
+          }
+        }
+      } catch (err) {
+        showFetchError(`${API}/balance?user_id=${encodeURIComponent(userId)}`, err);
+      } finally {
+        balanceBtn.disabled = false;
+      }
+    }
+
+    async function fetchHistory() {
+      const userId = getUserId();
+      historyBtn.disabled = true;
+      show("Loading history...");
+      try {
+        const url = `${API}/history?user_id=${encodeURIComponent(userId)}&limit=20`;
+        const res = await fetch(url);
+        const data = await res.json();
+        if (res.status === 401) {
+          show("Unauthorized (401).", data);
+          renderHistory([]);
+        } else if (!res.ok) {
+          showFetchError(url, res);
+          renderHistory([]);
+        } else {
+          const items = Array.isArray(data) ? data : data.history;
+          if (Array.isArray(items)) {
+            renderHistory(items);
+            show("History loaded", items);
+          } else {
+            show("No history data");
+            renderHistory([]);
+          }
+        }
+      } catch (err) {
+        showFetchError(`${API}/history?user_id=${encodeURIComponent(userId)}&limit=20`, err);
+        renderHistory([]);
+      } finally {
+        historyBtn.disabled = false;
+      }
+    }
+
+    async function resetBalance() {
+      const userId = getUserId();
+      resetBtn.disabled = true;
+      show("Resetting...");
+      try {
+        const url = `${API}/reset`;
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user_id: userId })
+        });
+        const data = await res.json();
+        balanceValue.textContent = data.coin ?? data.balance ?? "--";
+        if (res.status === 401) {
+          show("Unauthorized (401).", data);
+        } else if (!res.ok) {
+          showFetchError(url, res);
+        } else if (data.error) {
+          show("Error: " + data.error, data);
+        } else {
+          show("Reset response", data);
+        }
+        await fetchBalance({ silent: true });
+      } catch (err) {
+        showFetchError(`${API}/reset`, err);
+      } finally {
+        resetBtn.disabled = false;
+      }
+    }
+
+    async function fetchAdminUsers() {
+      if (!adminToken) {
+        show("Admin token daxil et");
+        return;
+      }
+      adminListBtn.disabled = true;
+      show("Loading admin users...");
+      try {
+        const url = `${API}/admin/users`;
+        const res = await fetch(url, {
+          headers: { "X-Admin-Token": adminToken }
+        });
+        const data = await res.json();
+        if (res.status === 401) {
+          show("Unauthorized (401). Check X-Admin-Token.", data);
+        } else if (!res.ok) {
+          showFetchError(url, res);
+        } else {
+          show("Admin users loaded", data);
+        }
+      } catch (err) {
+        showFetchError(`${API}/admin/users`, err);
+      } finally {
+        adminListBtn.disabled = false;
+      }
+    }
+
+    async function pingServer() {
+      const url = `${API}/`;
+      pingBtn.disabled = true;
+      show("Pinging...");
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+        show("Ping response", data);
+      } catch (err) {
+        showFetchError(url, err);
+      } finally {
+        pingBtn.disabled = false;
+      }
+    }
+
+    playBtn.addEventListener("click", play);
+    betInput.addEventListener("keyup", (e) => { if (e.key === "Enter") play(); });
+    balanceBtn.addEventListener("click", fetchBalance);
+    resetBtn.addEventListener("click", resetBalance);
+    userIdInput.addEventListener("input", () => {
+      syncUserLabel();
+    });
+    historyBtn.addEventListener("click", fetchHistory);
+    adminListBtn.addEventListener("click", fetchAdminUsers);
+    pingBtn.addEventListener("click", pingServer);
+    adminTokenInput.addEventListener("input", () => {
+      adminToken = (adminTokenInput.value || "").trim();
+      adminTokenText.textContent = adminToken || "not set";
+    });
+
+    syncUserLabel();
+    adminTokenText.textContent = "not set";
+    fetchBalance();
+  </script>
+</body>
+</html>
+
+
