@@ -134,3 +134,12 @@ def get_history(user_id: Optional[str] = None, limit: int = 20) -> List[Dict[str
             }
         )
     return history
+def get_all_users():
+    return list_users()
+# --- backward-compatible aliases (for older main.py imports) ---
+def get_all_users():
+    return list_users()
+
+def reset_all_coins(default_coin: int = 1000):
+    return reset_all_users(default_coin)
+
