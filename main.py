@@ -10,7 +10,7 @@ import datetime
 import random
 from db import (
     add_history,
-    get_all_users,
+    list_users,
     get_history as db_get_history,
     get_or_create_user,
     init_db,
@@ -126,7 +126,7 @@ def reset_balance(data: ResetRequest):
 @app.get("/admin/users")
 def admin_users(admin_token: str | None = Header(None, alias="X-Admin-Token")):
     require_admin(admin_token)
-    return {"users": get_all_users()}
+    return {"users": list_users()}
 
 
 @app.post("/admin/set_coin")
