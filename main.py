@@ -31,7 +31,7 @@ app.add_middleware(
 
 BASE_DIR = Path(__file__).resolve().parent
 INDEX_FILE = BASE_DIR / "index.html"
-DEFAULT_USER_ID = "user1"
+DEFAULT_USER_ID = "demo"
 ADMIN_TOKEN = "12345"
 
 STATIC_DIR = BASE_DIR / "static"
@@ -142,7 +142,9 @@ def admin_set_coin(
 @app.post("/admin/reset_all")
 def admin_reset_all(admin_token: str | None = Header(None, alias="X-Admin-Token")):
     require_admin(admin_token)
-    return {"users": reset_all_coins()}
+    reset_all_users()
+    return {"users": list_users()}
+
 
 
 @app.get("/history")
